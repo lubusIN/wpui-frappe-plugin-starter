@@ -16,7 +16,7 @@
     "./styles.scss": "./src/styles.scss"
   },
   "dependencies": {
-    "@lubusin/wp-frappe-data-store": "github:lubusIN/wp-frappe-data-store",
+    "@lubusin/wp-frappe-data-store": "^0.1.0",
     "@wordpress/components": "^36.0.0",
     "@wordpress/data": "latest",
     "@wordpress/dataviews": "^17.0.0",

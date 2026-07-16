@@ -21,12 +21,15 @@
     "pages": [
       {
         "id": "frappe-data-store",
-        "init": ["@wp-frappe-data-store/init"]
+        "init": [
+          "@wp-frappe-data-store/init"
+        ]
       }
     ]
   },
   "dependencies": {
-    "@lubusin/wp-frappe-data-store": "github:lubusIN/wp-frappe-data-store",
+    "@babel/core": "^7.24.0",
+    "@lubusin/wp-frappe-data-store": "^0.1.0",
     "@wordpress/boot": "latest",
     "@wordpress/components": "^36.0.0",
     "@wordpress/data": "latest",
@@ -35,16 +38,15 @@
     "@wordpress/i18n": "latest",
     "@wordpress/icons": "^15.0.0",
     "@wordpress/notices": "latest",
-    "@babel/core": "^7.24.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@wordpress/build": "latest",
-    "@wp-playground/cli": "latest",
     "@types/node": "latest",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
+    "@wordpress/build": "latest",
+    "@wp-playground/cli": "latest",
     "typescript": "latest"
   }
 }
