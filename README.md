@@ -1,10 +1,12 @@
+<p align="center"><img width="180" src=".github/assets/logo.svg"></p>
+
+<img src=".github/assets/banner.png" />
+
 # WPUI Frappe Plugin Starter
 
 A full-featured standalone WordPress plugin starter and template repository demonstrating how to use `@lubusin/wp-frappe-data-store` to build rich, reactive CRM administration interfaces inside WordPress.
 
 This plugin showcases modern WordPress engineering practices, featuring a full-screen admin application powered by **`@wordpress/boot`** and the next-generation **`@wordpress/build`** tooling.
-
----
 
 ## Features & Architecture
 
@@ -27,8 +29,6 @@ To provide a zero-config experience:
 - The plugin registers a custom WordPress REST API namespace: `/wp-json/frappe-data-store/v1/proxy`.
 - Browser requests are sent to this local endpoint with WordPress nonce (`X-WP-Nonce`) verification.
 - The PHP proxy (`includes/class-rest-proxy.php`) securely forwards the request to the external Frappe server using `wp_remote_request()`, preserving `Authorization` tokens and `X-Frappe-Site-URL` headers.
-
----
 
 ## Quickstart with WordPress Playground
 
@@ -62,8 +62,6 @@ When the app opens:
 2. Authenticate using either **Username & Password** or **API Key & Secret**.
 3. Once connected, browse, search, filter, create, edit, and delete CRM records directly inside WordPress!
 
----
-
 ## Development & Build Commands
 
 From the root directory:
@@ -81,3 +79,23 @@ npm run dev
 # Run Playground locally
 npm run playground
 ```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Support
+
+For issues and feature requests, please use the GitHub issue tracker.
+
+## Meet Your Artisans
+
+[LUBUS](https://lubus.in/?utm_source=github&utm_medium=open-source&utm_campaign=wpui-frappe-plugin-starter) is a web design agency based in Mumbai.
+
+<a href="https://cal.com/lubus">
+<img src="https://raw.githubusercontent.com/lubusIN/.github/refs/heads/main/profile/banner.png" />
+</a>
+
+## License
+
+WPUI Frappe Plugin Starter is open-sourced licensed under the [MIT License](LICENSE).
