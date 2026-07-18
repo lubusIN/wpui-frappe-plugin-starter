@@ -10,7 +10,7 @@
     },
     "steps": [
         {
-            "step": "login",
+            "step": "login"
         },
         {
             "step": "updateUserMeta",
