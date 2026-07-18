@@ -1,6 +1,7 @@
 import {
 	Button,
-	ButtonGroup,
+	__experimentalToggleGroupControl as ToggleGroupControl,
+	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 	Card,
 	CardBody,
 	Notice,
@@ -116,7 +117,6 @@ export function ConnectionView( {
 					onChange={ setUsername }
 					required
 					__next40pxDefaultSize
-					__nextHasNoMarginBottom
 				/>
 				<TextControl
 					label={ __( 'Password', 'wpui-frappe-plugin-starter' ) }
@@ -125,7 +125,6 @@ export function ConnectionView( {
 					onChange={ setPassword }
 					required
 					__next40pxDefaultSize
-					__nextHasNoMarginBottom
 				/>
 			</>
 		);
@@ -138,7 +137,6 @@ export function ConnectionView( {
 					onChange={ setApiKey }
 					required={ ! hasToken }
 					__next40pxDefaultSize
-					__nextHasNoMarginBottom
 				/>
 				<TextControl
 					label={ __( 'API secret', 'wpui-frappe-plugin-starter' ) }
@@ -155,7 +153,6 @@ export function ConnectionView( {
 							: undefined
 					}
 					__next40pxDefaultSize
-					__nextHasNoMarginBottom
 				/>
 			</>
 		);
@@ -247,42 +244,33 @@ export function ConnectionView( {
 									) }
 									required
 									__next40pxDefaultSize
-									__nextHasNoMarginBottom
 								/>
-								<ButtonGroup
-									className="frappe-auth-switcher"
-									aria-label={ __(
+								<ToggleGroupControl
+									label={ __(
 										'Authentication method',
 										'wpui-frappe-plugin-starter'
 									) }
+									hideLabelFromVision
+									value={ mode }
+									onChange={ ( value ) => setMode( value as 'password' | 'token' ) }
+									isBlock
+									__next40pxDefaultSize
 								>
-									<Button
-										variant={
-											mode === 'password'
-												? 'primary'
-												: 'secondary'
-										}
-										onClick={ () => setMode( 'password' ) }
-									>
-										{ __(
+									<ToggleGroupControlOption
+										value="password"
+										label={ __(
 											'Login',
 											'wpui-frappe-plugin-starter'
 										) }
-									</Button>
-									<Button
-										variant={
-											mode === 'token'
-												? 'primary'
-												: 'secondary'
-										}
-										onClick={ () => setMode( 'token' ) }
-									>
-										{ __(
+									/>
+									<ToggleGroupControlOption
+										value="token"
+										label={ __(
 											'API token',
 											'wpui-frappe-plugin-starter'
 										) }
-									</Button>
-								</ButtonGroup>
+									/>
+								</ToggleGroupControl>
 								{ credentialFields }
 								<div className="frappe-modal-actions">
 									<Button

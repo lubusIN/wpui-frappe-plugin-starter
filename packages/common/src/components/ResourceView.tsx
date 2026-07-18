@@ -13,13 +13,12 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import type {
 	FrappeListQuery,
 	FrappeResource,
-} from '@lubusin/wp-frappe-data-store';
-import {
 	getListKey,
 	useDocTypeDefinition,
 	useFrappeResourceActions,
 	useFrappeResourceList,
 } from '@lubusin/wp-frappe-data-store';
+
 import {
 	forgetConnectionValidation,
 	getConnectionStatus,
@@ -368,6 +367,8 @@ function ResourceDataView( {
 				)
 			);
 			setSelection( [] );
+			await Promise.resolve( invalidateResourceLists( pendingDeletion.doctype ) );
+			void fetchResourceList( pendingDeletion.doctype, listQuery );
 			setNotice(
 				sprintf(
 					/* translators: %d: number of deleted records. */
@@ -414,6 +415,8 @@ function ResourceDataView( {
 								...values,
 								name: items?.[ 0 ]?.name,
 							} );
+							await Promise.resolve( invalidateResourceLists( definition.name ) );
+							void fetchResourceList( definition.name, listQuery );
 							setNotice(
 								sprintf(
 									/* translators: %s: resource type. */
@@ -647,6 +650,8 @@ function ResourceDataView( {
 						onCancel={ () => setShowCreate( false ) }
 						onSubmit={ async ( values ) => {
 							await saveResource( definition.name, values );
+							await Promise.resolve( invalidateResourceLists( definition.name ) );
+							void fetchResourceList( definition.name, listQuery );
 							setShowCreate( false );
 							setNotice(
 								sprintf(
