@@ -34,6 +34,18 @@
 	letter-spacing: -0.02em;
 }
 
+.frappe-page-title {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.frappe-page-title p {
+	margin: 0;
+	color: #646970;
+	font-size: 12px;
+}
+
 .frappe-loading-indicator {
 	margin-left: 12px;
 	font-size: 0.85em;
@@ -122,20 +134,8 @@
 }
 
 .frappe-empty-state p {
-	margin: 0;
+	margin: 0 0 16px;
 	color: #757575;
-}
-
-.frappe-loading-overlay {
-	position: absolute;
-	inset: 72px 0 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 10px;
-	color: #646970;
-	font-size: 13px;
-	background: rgba(255, 255, 255, 0.86);
 }
 
 .frappe-connection-screen {
@@ -148,10 +148,10 @@
 
 .frappe-connection-card {
 	width: min(100%, 520px);
+}
+
+.frappe-connection-card .components-card__body {
 	padding: 40px;
-	background: #fff;
-	border-radius: 8px;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .frappe-connection-brand {
@@ -256,16 +256,8 @@
 	border-top: 1px solid #e0e0e0;
 }
 
-.frappe-form-error {
-	margin: 0;
-	padding: 10px 12px;
-	color: #8a2424;
-	background: #fcf0f1;
-	border-left: 3px solid #d63638;
-}
-
 @media (max-width: 600px) {
-	.frappe-connection-card {
+	.frappe-connection-card .components-card__body {
 		padding: 28px 24px;
 	}
 
@@ -273,6 +265,5 @@
 		width: min(420px, calc(100vw - 64px));
 	}
 }
-
 
 

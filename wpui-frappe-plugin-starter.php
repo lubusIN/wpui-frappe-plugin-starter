@@ -45,17 +45,19 @@ add_action( 'rest_api_init', static function () {
 add_action( 'frappe-data-store_init', static function () {
 	// Ensure wpApiSettings (REST root URL and nonce) are initialized for wp.apiFetch since early render bypasses admin_enqueue_scripts.
 	if ( wp_script_is( 'wp-api-fetch', 'registered' ) || wp_script_is( 'wp-api-fetch', 'enqueued' ) ) {
+		$connection = ( new WPUI_Frappe_REST_Proxy() )->get_connection()->get_data();
 		wp_add_inline_script(
 			'wp-api-fetch',
 			sprintf(
-				'window.wpApiSettings = %s;',
+				'window.wpApiSettings = %1$s; window.wpuiFrappeSettings = %2$s;',
 				wp_json_encode(
 					array(
 						'root'          => esc_url_raw( rest_url() ),
 						'nonce'         => wp_create_nonce( 'wp_rest' ),
 						'versionString' => 'wp/v2/',
 					)
-				)
+				),
+				wp_json_encode( $connection )
 			),
 			'before'
 		);

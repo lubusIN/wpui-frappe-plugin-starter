@@ -8,12 +8,49 @@ export type FrappeConnection = {
 	isConfigLocked: boolean;
 };
 
-let connection: FrappeConnection = {
-	siteUrl: '',
-	hasToken: false,
-	hasSession: false,
-	isConfigLocked: false,
+export type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
+
+type FrappeRuntime = {
+	connection: FrappeConnection;
+	status: ConnectionStatus;
+	validationRequest?: Promise<string>;
 };
+
+type FrappeWindow = Window & {
+	wpuiFrappeRuntime?: FrappeRuntime;
+	wpuiFrappeSettings?: FrappeConnection;
+};
+
+function getRuntime(): FrappeRuntime {
+	const browser = window as FrappeWindow;
+	if (!browser.wpuiFrappeRuntime) {
+		const initial = browser.wpuiFrappeSettings ?? {
+			siteUrl: '',
+			hasToken: false,
+			hasSession: false,
+			isConfigLocked: false,
+		};
+		browser.wpuiFrappeRuntime = {
+			connection: initial,
+			status: initial.hasToken || initial.hasSession ? 'connected' : 'disconnected',
+		};
+	}
+	return browser.wpuiFrappeRuntime;
+}
+
+export function getConnectionStatus(): ConnectionStatus {
+	return getRuntime().status;
+}
+
+function resetConnectionStatus(): void {
+	const runtime = getRuntime();
+	runtime.status = 'unknown';
+	runtime.validationRequest = undefined;
+}
+
+export function forgetConnectionValidation(): void {
+	resetConnectionStatus();
+}
 
 export function getWpNonceHeader(): HeadersInit {
 	const nonce = (
@@ -81,14 +118,19 @@ export function normalizeFrappeSiteUrl(value: string): string {
 }
 
 export function getFrappeSiteUrl(): string {
-	return connection.siteUrl;
+	return getRuntime().connection.siteUrl;
+}
+
+export function getFrappeConnection(): FrappeConnection {
+	return getRuntime().connection;
 }
 
 export async function loadFrappeConnection(): Promise<FrappeConnection> {
 	const response = await request('/connection');
 	if (!response.ok) throw await responseError(response);
-	connection = (await response.json()) as FrappeConnection;
-	return connection;
+	getRuntime().connection = (await response.json()) as FrappeConnection;
+	resetConnectionStatus();
+	return getRuntime().connection;
 }
 
 export async function saveFrappeConnection(
@@ -105,8 +147,9 @@ export async function saveFrappeConnection(
 		}),
 	});
 	if (!response.ok) throw await responseError(response);
-	connection = (await response.json()) as FrappeConnection;
-	return connection;
+	getRuntime().connection = (await response.json()) as FrappeConnection;
+	resetConnectionStatus();
+	return getRuntime().connection;
 }
 
 export async function loginWithPassword(
@@ -126,8 +169,9 @@ export async function loginWithPassword(
 		body: JSON.stringify({ username: username.trim(), password }),
 	});
 	if (!response.ok) throw await responseError(response);
-	connection = (await response.json()) as FrappeConnection;
-	return connection;
+	getRuntime().connection = (await response.json()) as FrappeConnection;
+	resetConnectionStatus();
+	return getRuntime().connection;
 }
 
 export async function logoutPasswordSession(): Promise<FrappeConnection> {
@@ -135,8 +179,9 @@ export async function logoutPasswordSession(): Promise<FrappeConnection> {
 		method: 'POST',
 	});
 	if (!response.ok) throw await responseError(response);
-	connection = (await response.json()) as FrappeConnection;
-	return connection;
+	getRuntime().connection = (await response.json()) as FrappeConnection;
+	resetConnectionStatus();
+	return getRuntime().connection;
 }
 
 export async function clearFrappeConnection(): Promise<void> {
@@ -144,12 +189,13 @@ export async function clearFrappeConnection(): Promise<void> {
 	const response = await request('/connection', {
 		method: 'POST',
 		body: JSON.stringify({
-			siteUrl: connection.siteUrl,
+			siteUrl: getRuntime().connection.siteUrl,
 			clearToken: true,
 		}),
 	});
 	if (!response.ok) throw await responseError(response);
-	connection = (await response.json()) as FrappeConnection;
+	getRuntime().connection = (await response.json()) as FrappeConnection;
+	resetConnectionStatus();
 }
 
 function getFrappeMessage(body: Record<string, unknown>): string {
@@ -159,17 +205,34 @@ function getFrappeMessage(body: Record<string, unknown>): string {
 }
 
 export async function validateFrappeConnection(): Promise<string> {
-	if (!connection.siteUrl) await loadFrappeConnection();
-	const response = await request(
-		'/proxy/api/method/frappe.auth.get_logged_user'
-	);
-	const body = (await response.json().catch(() => ({}))) as Record<
-		string,
-		unknown
-	>;
-	if (!response.ok || body.exc_type) throw new Error(getFrappeMessage(body));
-	if (typeof body.message !== 'string' || body.message === 'Guest') {
-		throw new Error('Connect with a valid Frappe login or API token to continue.');
-	}
-	return body.message;
+	const runtime = getRuntime();
+	if (runtime.status === 'connected') return 'Connected';
+	if (runtime.validationRequest) return runtime.validationRequest;
+
+	runtime.status = 'checking';
+	runtime.validationRequest = (async () => {
+		try {
+			if (!runtime.connection.siteUrl) await loadFrappeConnection();
+			const response = await request(
+				'/proxy/api/method/frappe.auth.get_logged_user'
+			);
+			const body = (await response.json().catch(() => ({}))) as Record<
+				string,
+				unknown
+			>;
+			if (!response.ok || body.exc_type) throw new Error(getFrappeMessage(body));
+			if (typeof body.message !== 'string' || body.message === 'Guest') {
+				throw new Error('Connect with a valid Frappe login or API token to continue.');
+			}
+			runtime.status = 'connected';
+			return body.message;
+		} catch (error) {
+			runtime.status = 'disconnected';
+			throw error;
+		} finally {
+			runtime.validationRequest = undefined;
+		}
+	})();
+
+	return runtime.validationRequest;
 }

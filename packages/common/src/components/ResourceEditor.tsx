@@ -1,4 +1,4 @@
-import { Button, Spinner } from '@wordpress/components';
+import { Button, Notice } from '@wordpress/components';
 import {
 	DataForm,
 	type Field,
@@ -101,10 +101,13 @@ export function ResourceEditor({
 					setValues((current) => ({ ...current, ...edits }))
 				}
 			/>
-			{error && <p className="frappe-form-error">{error}</p>}
+			{error && (
+				<Notice status="error" isDismissible={false}>
+					{error}
+				</Notice>
+			)}
 			<div className="frappe-modal-actions">
-				<Button variant="primary" type="submit" disabled={isSaving}>
-					{isSaving && <Spinner />}
+				<Button variant="primary" type="submit" isBusy={isSaving} disabled={isSaving}>
 					{item ? 'Save changes' : `Create ${definition?.name ?? 'Resource'}`}
 				</Button>
 				<Button variant="tertiary" onClick={onCancel} disabled={isSaving}>

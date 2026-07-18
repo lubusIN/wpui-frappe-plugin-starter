@@ -29,7 +29,12 @@ import {
 	useFrappeResourceActions,
 	useFrappeResourceList,
 } from '@lubusin/wp-frappe-data-store';
-import { getFrappeSiteUrl, validateFrappeConnection } from '../auth';
+import {
+	forgetConnectionValidation,
+	getConnectionStatus,
+	getFrappeSiteUrl,
+	validateFrappeConnection,
+} from '../auth';
 import { ConnectionView } from './ConnectionView';
 import {
 	DOC_TYPE_SHELLS,
@@ -94,13 +99,21 @@ type Props = {
 };
 
 export function ResourceView({ docType }: Props) {
-	const [connectionState, setConnectionState] = useState<'checking' | 'connected' | 'disconnected'>('checking');
+	const [connectionState, setConnectionState] = useState<
+		'checking' | 'connected' | 'disconnected'
+	>(() => {
+		const status = getConnectionStatus();
+		if (status === 'connected') return 'connected';
+		if (status === 'disconnected') return 'disconnected';
+		return 'checking';
+	});
 	const selectedShell = useMemo(
 		() => DOC_TYPE_SHELLS.find((shell) => shell.name === docType) ?? { name: docType, label: docType, description: '' },
 		[docType]
 	);
 
 	useEffect(() => {
+		if (connectionState !== 'checking') return;
 		let isCurrent = true;
 		void validateFrappeConnection().then(
 			() => {
@@ -113,7 +126,7 @@ export function ResourceView({ docType }: Props) {
 		return () => {
 			isCurrent = false;
 		};
-	}, []);
+	}, [connectionState]);
 
 	if (connectionState === 'checking') {
 		return <ConnectionView isChecking />;
@@ -134,7 +147,10 @@ export function ResourceView({ docType }: Props) {
 	return (
 		<ConnectedResourceView
 			selectedShell={selectedShell}
-			onDisconnect={() => setConnectionState('disconnected')}
+			onDisconnect={() => {
+				forgetConnectionValidation();
+				setConnectionState('disconnected');
+			}}
 		/>
 	);
 }
@@ -155,12 +171,65 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 		isResolving: isDefinitionResolving,
 		error: definitionError,
 	} = useDocTypeDefinition(frappeStore, selectedShell.name);
+
+	if (definitionError) {
+		return (
+			<div className="frappe-main-frame">
+				<header className="frappe-topbar">
+					<h1>{selectedShell.label}</h1>
+				</header>
+				<Notice status="error" isDismissible={false}>
+					<strong>Couldn't load {selectedShell.label.toLowerCase()} metadata.</strong>{' '}
+					{errorMessage(definitionError)}{' '}
+					<Button variant="link" onClick={onDisconnect}>
+						Reconnect to Frappe
+					</Button>
+				</Notice>
+			</div>
+		);
+	}
+
+	if (!definition) {
+		return (
+			<div className="frappe-main-frame">
+				<header className="frappe-topbar">
+					<Flex align="center" gap={3}>
+						<div className="frappe-page-title">
+							<h1>{selectedShell.label}</h1>
+							{selectedShell.description && <p>{selectedShell.description}</p>}
+						</div>
+						{isDefinitionResolving && <Spinner />}
+					</Flex>
+				</header>
+			</div>
+		);
+	}
+
+	return (
+		<ResourceDataView
+			selectedShell={selectedShell}
+			definition={definition}
+			onDisconnect={onDisconnect}
+		/>
+	);
+}
+
+type ResourceDataViewProps = ConnectedProps & {
+	definition: DocTypeDefinition;
+};
+
+function ResourceDataView({
+	selectedShell,
+	definition,
+	onDisconnect,
+}: ResourceDataViewProps) {
 	const [view, setView] = useState<View>(() => initialView());
 	const [selection, setSelection] = useState<string[]>([]);
 	const [showCreate, setShowCreate] = useState(false);
 	const [notice, setNotice] = useState<string>();
 	const [actionError, setActionError] = useState<string>();
 	const [isDeleting, setDeleting] = useState(false);
+	const [isRefreshing, setRefreshing] = useState(false);
 	const [visibleResources, setVisibleResources] = useState<FrappeResource[] | undefined>();
 	const [pendingDeletion, setPendingDeletion] = useState<{
 		items: FrappeResource[];
@@ -179,15 +248,11 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 		setActionError(undefined);
 	}, [definition]);
 
-	const fields = useMemo(
-		() => (definition ? makeFields(definition) : []),
-		[definition]
-	);
+	const fields = useMemo(() => makeFields(definition), [definition]);
 
 	const listQuery = useMemo<FrappeListQuery>(() => {
-		const fields = definition?.fields.map((field) => field.id) ?? ['name'];
 		return {
-			fields,
+			fields: definition.fields.map((field) => field.id),
 			limit: 100,
 			orderBy: 'modified desc',
 		};
@@ -221,14 +286,9 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 		}
 	}, [resources]);
 
-	// Eager fetch on mount — connection is already confirmed at this point.
-	useEffect(() => {
-		fetchResourceList(selectedShell.name, listQuery).catch(() => {});
-	}, [fetchResourceList, listQuery, selectedShell.name]);
-
 	const displayedResources = resources ?? visibleResources;
 	const placeholderResources =
-		(isResolving || isDefinitionResolving) && !(displayedResources?.length)
+		isResolving && !(displayedResources?.length)
 			? Array.from({ length: 6 }).map((_, index) => ({
 					name: `placeholder-${selectedShell.name}-${index}`,
 				}))
@@ -239,11 +299,18 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 	);
 
 	async function refresh() {
+		setRefreshing(true);
 		setNotice(undefined);
 		setActionError(undefined);
-		const doctype = definition?.name ?? selectedShell.name;
-		await Promise.resolve(invalidateResourceLists(doctype));
-		await fetchResourceList(doctype, listQuery);
+		try {
+			const doctype = definition.name ?? selectedShell.name;
+			await Promise.resolve(invalidateResourceLists(doctype));
+			await fetchResourceList(doctype, listQuery);
+		} catch (refreshError) {
+			setActionError(errorMessage(refreshError));
+		} finally {
+			setRefreshing(false);
+		}
 	}
 
 	async function confirmDeletion() {
@@ -323,8 +390,11 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 				<Flex align="center" gap={3}>
 					<FlexBlock>
 						<Flex align="center" gap={3}>
-							<h1>{selectedShell.label}</h1>
-							{(isResolving || isDefinitionResolving) && (
+							<div className="frappe-page-title">
+								<h1>{selectedShell.label}</h1>
+								{selectedShell.description && <p>{selectedShell.description}</p>}
+							</div>
+							{isResolving && !displayedResources?.length && (
 								<span className="frappe-loading-indicator">
 									<Spinner />
 									Loading
@@ -339,27 +409,27 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 						</Flex>
 					</FlexBlock>
 					<FlexItem>
-						<Button
-							icon={plus}
-							variant="primary"
-							onClick={() => setShowCreate(true)}
-							disabled={!definition}
-						>
-							Add {selectedShell.label.replace(/s$/, '')}
-						</Button>
+						<Flex gap={2}>
+							<Button
+								variant="secondary"
+								onClick={() => void refresh()}
+								isBusy={isRefreshing}
+								disabled={isRefreshing}
+							>
+								Refresh
+							</Button>
+							<Button
+								icon={plus}
+								variant="primary"
+								onClick={() => setShowCreate(true)}
+							>
+								Add {selectedShell.label.replace(/s$/, '')}
+							</Button>
+						</Flex>
 					</FlexItem>
 				</Flex>
 			</header>
 			<main className="frappe-main">
-				{Boolean(definitionError) && (
-					<Notice status="error" isDismissible={false}>
-						<strong>Couldn't load {selectedShell.label.toLowerCase()} metadata.</strong>{' '}
-						{errorMessage(definitionError)}{' '}
-						<Button variant="link" onClick={onDisconnect}>
-							Reconnect to Frappe
-						</Button>
-					</Notice>
-				)}
 				{Boolean(error) && (
 					<Notice status="error" isDismissible={false}>
 						<strong>Couldn't load {selectedShell.label.toLowerCase()}.</strong>{' '}
@@ -387,7 +457,7 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 						fields={fields}
 						data={processed.data}
 						getItemId={(item) => item?.name ?? ''}
-						isLoading={isResolving || isDefinitionResolving}
+						isLoading={isResolving && !displayedResources?.length}
 						paginationInfo={processed.paginationInfo}
 						selection={selection}
 						onChangeSelection={setSelection}
@@ -400,22 +470,21 @@ function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) 
 							list: {},
 						}}
 						config={{ perPageSizes: [10, 20, 50, 100] }}
-						empty={
+							empty={
 							<div className="frappe-empty-state">
 								<div className="frappe-empty-icon">
 									<Icon icon={plus} size={24} />
 								</div>
 								<h2>No {selectedShell.label.toLowerCase()} found</h2>
 								<p>Create a record or adjust the active filters.</p>
+								{definition && (
+									<Button variant="secondary" onClick={() => setShowCreate(true)}>
+										Add {selectedShell.label.replace(/s$/, '')}
+									</Button>
+								)}
 							</div>
 						}
 					/>
-					{isResolving && !resources && (
-						<div className="frappe-loading-overlay">
-							<Spinner />
-							<span>Loading {selectedShell.label.toLowerCase()}…</span>
-						</div>
-					)}
 				</section>
 			</main>
 

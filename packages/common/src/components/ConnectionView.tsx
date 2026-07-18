@@ -1,9 +1,17 @@
-import { Button, Notice, Spinner, TextControl } from '@wordpress/components';
-import { useEffect, useState } from '@wordpress/element';
+import {
+	Button,
+	ButtonGroup,
+	Card,
+	CardBody,
+	Notice,
+	Spinner,
+	TextControl,
+} from '@wordpress/components';
+import { useState } from '@wordpress/element';
 import { Icon, wordpress } from '@wordpress/icons';
 import {
 	clearFrappeConnection,
-	loadFrappeConnection,
+	getFrappeConnection,
 	loginWithPassword,
 	logoutPasswordSession,
 	saveFrappeConnection,
@@ -21,41 +29,22 @@ export function ConnectionView({
 	onAuthenticated,
 	onDisconnected,
 }: Props) {
-	const [siteUrl, setSiteUrl] = useState('');
-	const [mode, setMode] = useState<'password' | 'token'>('password');
+	const initialConnection = getFrappeConnection();
+	const [siteUrl, setSiteUrl] = useState(initialConnection.siteUrl);
+	const [mode, setMode] = useState<'password' | 'token'>(
+		initialConnection.hasToken && !initialConnection.hasSession
+			? 'token'
+			: 'password'
+	);
 	const [username, setUsername] = useState('');
 	const [password, setPassword] = useState('');
 	const [apiKey, setApiKey] = useState('');
 	const [apiSecret, setApiSecret] = useState('');
-	const [hasToken, setHasToken] = useState(false);
-	const [hasSession, setHasSession] = useState(false);
-	const [isConfigLocked, setConfigLocked] = useState(false);
-	const [isLoading, setLoading] = useState(true);
+	const [hasToken, setHasToken] = useState(initialConnection.hasToken);
+	const [hasSession, setHasSession] = useState(initialConnection.hasSession);
+	const [isConfigLocked] = useState(initialConnection.isConfigLocked);
 	const [isBusy, setBusy] = useState(false);
 	const [message, setMessage] = useState<string>();
-
-	useEffect(() => {
-		let current = true;
-		void loadFrappeConnection().then(
-			(settings) => {
-				if (!current) return;
-				setSiteUrl(settings.siteUrl);
-				setHasToken(settings.hasToken);
-				setHasSession(settings.hasSession);
-				setMode(settings.hasToken && !settings.hasSession ? 'token' : 'password');
-				setConfigLocked(settings.isConfigLocked);
-				setLoading(false);
-			},
-			(error) => {
-				if (!current) return;
-				setMessage(error instanceof Error ? error.message : String(error));
-				setLoading(false);
-			}
-		);
-		return () => {
-			current = false;
-		};
-	}, []);
 
 	async function connect() {
 		setBusy(true);
@@ -108,10 +97,11 @@ export function ConnectionView({
 		}
 	}
 
-	const checking = isChecking || isLoading;
+	const checking = isChecking;
 	return (
 		<div className="frappe-connection-screen">
-			<section className="frappe-connection-card" aria-live="polite">
+			<Card className="frappe-connection-card" elevation={2}>
+				<CardBody aria-live="polite">
 				<div className="frappe-connection-brand">
 					<Icon icon={wordpress} size={40} />
 					<div>
@@ -152,7 +142,7 @@ export function ConnectionView({
 								__next40pxDefaultSize
 								__nextHasNoMarginBottom
 							/>
-							<div className="frappe-auth-switcher" role="group" aria-label="Authentication method">
+							<ButtonGroup className="frappe-auth-switcher" aria-label="Authentication method">
 								<Button
 									variant={mode === 'password' ? 'primary' : 'secondary'}
 									onClick={() => setMode('password')}
@@ -165,7 +155,7 @@ export function ConnectionView({
 								>
 									API token
 								</Button>
-							</div>
+							</ButtonGroup>
 							{mode === 'password' ? (
 								<>
 									<TextControl
@@ -223,7 +213,8 @@ export function ConnectionView({
 						</form>
 					</>
 				)}
-			</section>
+				</CardBody>
+			</Card>
 		</div>
 	);
 }
