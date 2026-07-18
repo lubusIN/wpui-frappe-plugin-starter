@@ -42,3 +42,4 @@ build/
 **/build/
 **/build-module/
 **/build-style/
+*.content-entry.js

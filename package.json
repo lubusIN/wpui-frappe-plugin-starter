@@ -11,7 +11,7 @@
     "build": "wp-build",
     "postbuild": "node ./scripts/postbuild.mjs",
     "dev": "npm run build && wp-build --watch",
-    "playground": "wp-playground-cli server --auto-mount --blueprint=blueprint.json --port=9400"
+    "playground": "wp-playground-cli start --blueprint=_playground/blueprint-local.json"
   },
   "wpPlugin": {
     "name": "wp_frappe_data_store",
