@@ -16,7 +16,9 @@ For detailed architectural insights, including how we use `@wordpress/boot`, npm
 You can instantly test and interact with this plugin locally without installing Docker, MySQL, or a local PHP server! We include a pre-configured WordPress Playground setup.
 
 ### Prerequisites
-- Node.js (v18+) and npm
+- Node.js 20+ and npm
+- WordPress 7.0+ (or a compatible Gutenberg plugin that provides `@wordpress/boot`)
+- PHP 7.4+
 
 ### Build & Run
 
@@ -39,7 +41,34 @@ Running `npm run playground` will automatically:
 3. Log you in as `admin`.
 4. Open your browser directly to the CRM Dashboard.
 
-**Connecting to Frappe**: Once the app opens in your browser, enter your Frappe CRM site URL and authenticate (via Username & Password or API Key) to start browsing and managing CRM records directly inside WordPress!
+**Connecting to Frappe**: Once the app opens, enter the Frappe CRM origin and choose either username/password login or a dedicated API key/secret. Passwords are never persisted; Frappe sessions and API tokens remain server-side.
+
+### Production connection
+
+Keep Frappe credentials out of browser storage by defining them in `wp-config.php`:
+
+```php
+define( 'WPUI_FRAPPE_SITE_URL', 'https://crm.example.com' );
+define( 'WPUI_FRAPPE_API_TOKEN', 'API_KEY:API_SECRET' );
+```
+
+Use a dedicated, least-privilege Frappe user. Administrators may alternatively
+save the origin and API token through the Connection screen; the values remain
+server-side and are never returned by the REST API.
+
+Local/private network origins are rejected by default. For local development
+only, `WPUI_FRAPPE_ALLOW_LOCAL` can opt in to such origins. TLS verification
+remains enabled unless `WPUI_FRAPPE_ALLOW_INSECURE_TLS` is explicitly enabled.
+The included local Playground blueprint enables both flags so self-signed
+origins such as `https://frappe.localhost` work during development. Restart the
+Playground after changing blueprint constants.
+
+### Quality and release
+
+```bash
+npm run check       # TypeScript, PHP syntax, and production build
+npm run plugin-zip  # Create an installable release archive
+```
 
 ## Contributing
 
@@ -59,4 +88,4 @@ For issues and feature requests, please use the GitHub issue tracker.
 
 ## License
 
-WPUI Frappe Plugin Starter is open-sourced licensed under the [MIT License](LICENSE).
+WPUI Frappe Plugin Starter is licensed under the MIT License.

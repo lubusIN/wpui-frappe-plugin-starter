@@ -1,203 +1,347 @@
 <?php
 /**
- * REST API Proxy for Frappe CRM.
+ * Authenticated REST proxy for the configured Frappe site.
  *
- * Prevents browser CORS restrictions when running inside WordPress admin or WordPress Playground
- * by relaying requests from the frontend datastore to the Frappe server using wp_remote_request().
- *
- * @package WP_Frappe_Data_Store_Sample
+ * @package WPUI_Frappe_Plugin_Starter
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class WP_Frappe_Data_Store_REST_Proxy {
+/**
+ * Proxies the small Frappe API surface used by the datastore.
+ */
+final class WPUI_Frappe_REST_Proxy extends WP_REST_Controller {
+	const OPTION_SITE_URL = 'wpui_frappe_site_url';
+	const OPTION_API_TOKEN = 'wpui_frappe_api_token';
+	const USER_META_SESSION = '_wpui_frappe_session';
 
-	/**
-	 * Namespace for REST routes.
-	 *
-	 * @var string
-	 */
-	const NAMESPACE = 'frappe-data-store/v1';
+	/** Set up the controller. */
+	public function __construct() {
+		$this->namespace = 'wpui-frappe/v1';
+		$this->rest_base = 'connection';
+	}
 
-	/**
-	 * Register REST routes.
-	 */
+	/** Register connection and proxy routes. */
 	public function register_routes() {
-		// Settings endpoint to get/set default fallback URL and credentials.
 		register_rest_route(
-			self::NAMESPACE,
-			'/settings',
+			$this->namespace,
+			'/' . $this->rest_base,
 			array(
 				array(
 					'methods'             => WP_REST_Server::READABLE,
-					'callback'            => array( $this, 'get_settings' ),
+					'callback'            => array( $this, 'get_connection' ),
 					'permission_callback' => array( $this, 'check_permission' ),
 				),
 				array(
-					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'save_settings' ),
+					'methods'             => WP_REST_Server::EDITABLE,
+					'callback'            => array( $this, 'update_connection' ),
 					'permission_callback' => array( $this, 'check_permission' ),
+					'args'                => $this->get_connection_args(),
 				),
-			)
+			),
 		);
 
-		// Proxy endpoint matching any path after /proxy/.
 		register_rest_route(
-			self::NAMESPACE,
-			'/proxy/(?P<path>.*)',
+			$this->namespace,
+			'/login',
 			array(
-				array(
-					'methods'             => WP_REST_Server::ALLMETHODS,
-					'callback'            => array( $this, 'handle_proxy' ),
-					'permission_callback' => array( $this, 'check_permission' ),
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'login' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'args'                => array(
+					'username' => array(
+						'type'              => 'string',
+						'required'          => true,
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'password' => array(
+						'type'     => 'string',
+						'required' => true,
+					),
 				),
-			)
+			),
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/logout',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'logout' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+			),
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/proxy/(?P<path>api/(?:resource(?:/.*)?|method/frappe\.auth\.get_logged_user))',
+			array(
+				'methods'             => array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ),
+				'callback'            => array( $this, 'proxy_request' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'args'                => array(
+					'path' => array(
+						// Do not use sanitize_text_field(): it removes encoded octets,
+						// turning DocTypes such as "CRM%20Deal" into "CRMDeal".
+						// The route regex above is the path allowlist.
+						'type'     => 'string',
+						'required' => true,
+					),
+				),
+			),
 		);
 	}
 
-	/**
-	 * Check if current user has permission to manage options.
-	 *
-	 * @return bool
-	 */
+	/** @return bool Whether the current user may administer the connection. */
 	public function check_permission() {
 		return current_user_can( 'manage_options' );
 	}
 
-	/**
-	 * Get saved connection settings.
-	 *
-	 * @return WP_REST_Response
-	 */
-	public function get_settings() {
-		return new WP_REST_Response(
-			array(
-				'siteUrl' => get_option( 'frappe_sample_site_url', 'https://frappe.localhost' ),
-				'hasToken' => ! empty( get_option( 'frappe_sample_api_token', '' ) ),
+	/** @return array REST argument definitions. */
+	private function get_connection_args() {
+		return array(
+			'siteUrl'   => array(
+				'type'              => 'string',
+				'required'          => true,
+				'sanitize_callback' => 'esc_url_raw',
+				'validate_callback' => array( $this, 'validate_site_url' ),
 			),
-			200
+			'apiKey'    => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			),
+			'apiSecret' => array(
+				'type'              => 'string',
+				'sanitize_callback' => 'sanitize_text_field',
+			),
+			'clearToken' => array(
+				'type'    => 'boolean',
+				'default' => false,
+			),
 		);
 	}
 
 	/**
-	 * Save connection settings.
+	 * Validate an origin-only HTTP(S) URL.
 	 *
-	 * @param WP_REST_Request $request Request object.
-	 * @return WP_REST_Response
+	 * Private/local hosts are accepted only when WPUI_FRAPPE_ALLOW_LOCAL is true.
+	 *
+	 * @param string $value Candidate URL.
+	 * @return bool
 	 */
-	public function save_settings( $request ) {
-		$params = $request->get_json_params();
-		if ( isset( $params['siteUrl'] ) ) {
-			update_option( 'frappe_sample_site_url', esc_url_raw( trim( $params['siteUrl'] ) ) );
+	public function validate_site_url( $value ) {
+		$url = wp_parse_url( $value );
+		if ( ! is_array( $url ) || empty( $url['scheme'] ) || empty( $url['host'] ) ) {
+			return false;
 		}
-		if ( isset( $params['apiToken'] ) ) {
-			update_option( 'frappe_sample_api_token', sanitize_text_field( trim( $params['apiToken'] ) ) );
+		if ( ! in_array( strtolower( $url['scheme'] ), array( 'http', 'https' ), true ) ) {
+			return false;
 		}
-		if ( ! empty( $params['clearToken'] ) ) {
-			delete_option( 'frappe_sample_api_token' );
+		if ( isset( $url['user'] ) || isset( $url['pass'] ) || isset( $url['query'] ) || isset( $url['fragment'] ) ) {
+			return false;
 		}
-		return $this->get_settings();
+		if ( isset( $url['path'] ) && '/' !== $url['path'] && '' !== $url['path'] ) {
+			return false;
+		}
+
+		$allow_local = defined( 'WPUI_FRAPPE_ALLOW_LOCAL' ) && true === WPUI_FRAPPE_ALLOW_LOCAL;
+		return $allow_local || false !== wp_http_validate_url( $value );
+	}
+
+	/** @return string Configured upstream origin. */
+	private function get_site_url() {
+		if ( defined( 'WPUI_FRAPPE_SITE_URL' ) ) {
+			return untrailingslashit( WPUI_FRAPPE_SITE_URL );
+		}
+		return untrailingslashit( (string) get_option( self::OPTION_SITE_URL, '' ) );
+	}
+
+	/** @return string Configured Frappe token without the auth scheme. */
+	private function get_api_token() {
+		if ( defined( 'WPUI_FRAPPE_API_TOKEN' ) ) {
+			return preg_replace( '/^token\s+/i', '', trim( WPUI_FRAPPE_API_TOKEN ) );
+		}
+		return (string) get_option( self::OPTION_API_TOKEN, '' );
+	}
+
+	/** @return array Stored cookies for the current WordPress user. */
+	private function get_session_cookies() {
+		$cookies = get_user_meta( get_current_user_id(), self::USER_META_SESSION, true );
+		if ( ! is_array( $cookies ) ) {
+			return array();
+		}
+		return array_values(
+			array_filter(
+				array_map(
+					static function ( $cookie ) {
+						if ( ! is_array( $cookie ) || empty( $cookie['name'] ) || ! isset( $cookie['value'] ) || ( ! empty( $cookie['expires'] ) && (int) $cookie['expires'] <= time() ) ) {
+							return null;
+						}
+						return new WP_Http_Cookie(
+							array(
+								'name'    => sanitize_key( $cookie['name'] ),
+								'value'   => (string) $cookie['value'],
+								'expires' => isset( $cookie['expires'] ) ? (int) $cookie['expires'] : null,
+							)
+						);
+					},
+					$cookies
+				)
+			)
+		);
+	}
+
+	/** @return WP_REST_Response Safe connection metadata. */
+	public function get_connection() {
+		return rest_ensure_response(
+			array(
+				'siteUrl'       => $this->get_site_url(),
+				'hasToken'      => '' !== $this->get_api_token(),
+				'hasSession'    => ! empty( $this->get_session_cookies() ),
+				'isConfigLocked' => defined( 'WPUI_FRAPPE_SITE_URL' ) || defined( 'WPUI_FRAPPE_API_TOKEN' ),
+			)
+		);
 	}
 
 	/**
-	 * Proxy requests to Frappe CRM.
+	 * Save connection settings. Constants always take precedence over options.
 	 *
-	 * @param WP_REST_Request $request Request object.
+	 * @param WP_REST_Request $request Request.
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public function handle_proxy( $request ) {
-		$target_path = '/' . ltrim( $request['path'], '/' );
-		$query_params = $request->get_query_params();
-		unset( $query_params['rest_route'] );
-
-		if ( ! empty( $query_params ) ) {
-			$target_path .= '?' . http_build_query( $query_params );
+	public function update_connection( $request ) {
+		if ( defined( 'WPUI_FRAPPE_SITE_URL' ) || defined( 'WPUI_FRAPPE_API_TOKEN' ) ) {
+			return new WP_Error( 'wpui_frappe_locked', __( 'The Frappe connection is managed in wp-config.php.', 'wpui-frappe-plugin-starter' ), array( 'status' => 409 ) );
 		}
 
-		$site_url = $request->get_header( 'x_frappe_site_url' );
-		if ( empty( $site_url ) ) {
-			$site_url = get_option( 'frappe_sample_site_url', 'https://frappe.localhost' );
+		$api_key    = trim( (string) $request->get_param( 'apiKey' ) );
+		$api_secret = trim( (string) $request->get_param( 'apiSecret' ) );
+		if ( ( '' === $api_key ) !== ( '' === $api_secret ) ) {
+			return new WP_Error( 'wpui_frappe_incomplete_token', __( 'Both API key and API secret are required.', 'wpui-frappe-plugin-starter' ), array( 'status' => 400 ) );
 		}
-		$site_url = rtrim( $site_url, '/' );
 
-		$url = $site_url . $target_path;
+		update_option( self::OPTION_SITE_URL, untrailingslashit( $request->get_param( 'siteUrl' ) ), false );
+		if ( $request->get_param( 'clearToken' ) ) {
+			delete_option( self::OPTION_API_TOKEN );
+		} elseif ( '' !== $api_key ) {
+			update_option( self::OPTION_API_TOKEN, $api_key . ':' . $api_secret, false );
+		}
 
-		$headers = array(
-			'Accept' => 'application/json',
+		return $this->get_connection();
+	}
+
+	/**
+	 * Exchange Frappe credentials for a server-side session.
+	 *
+	 * The password is used for this request only and is never persisted.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function login( $request ) {
+		$site_url = $this->get_site_url();
+		if ( '' === $site_url || ! $this->validate_site_url( $site_url ) ) {
+			return new WP_Error( 'wpui_frappe_not_configured', __( 'Save a valid Frappe site URL first.', 'wpui-frappe-plugin-starter' ), array( 'status' => 503 ) );
+		}
+
+		$args = array(
+			'headers'     => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
+			'body'        => array(
+				'usr' => (string) $request->get_param( 'username' ),
+				'pwd' => (string) $request->get_param( 'password' ),
+			),
+			'timeout'     => 20,
+			'redirection' => 0,
+			'sslverify'   => ! ( defined( 'WPUI_FRAPPE_ALLOW_INSECURE_TLS' ) && true === WPUI_FRAPPE_ALLOW_INSECURE_TLS ),
 		);
-
-		$auth_header = $request->get_header( 'authorization' );
-		if ( empty( $auth_header ) ) {
-			$api_token = get_option( 'frappe_sample_api_token', '' );
-			if ( ! empty( $api_token ) ) {
-				$auth_header = 'token ' . $api_token;
-			}
-		}
-
-		if ( ! empty( $auth_header ) ) {
-			$headers['Authorization'] = $auth_header;
-		}
-
-		$method = $request->get_method();
-		$args   = array(
-			'method'    => $method,
-			'headers'   => $headers,
-			'timeout'   => 15,
-			'sslverify' => false, // For local dev/self-signed certs.
-		);
-
-		if ( in_array( $method, array( 'POST', 'PUT', 'PATCH', 'DELETE' ), true ) ) {
-			$body = $request->get_body();
-			if ( ! empty( $body ) ) {
-				$args['body'] = $body;
-				$args['headers']['Content-Type'] = $request->get_header( 'content_type' ) ?: 'application/json';
-			} elseif ( ! empty( $request->get_params() ) && 'POST' === $method ) {
-				// Handle form-urlencoded login requests.
-				$args['body'] = http_build_query( $request->get_body_params() );
-				$args['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
-			}
-		}
-
-		// Forward cookies if present (for password session login).
-		$cookie_header = $request->get_header( 'cookie' );
-		if ( ! empty( $cookie_header ) ) {
-			$args['headers']['Cookie'] = $cookie_header;
-		}
-
-		$response = wp_remote_request( $url, $args );
-
+		$allow_local = defined( 'WPUI_FRAPPE_ALLOW_LOCAL' ) && true === WPUI_FRAPPE_ALLOW_LOCAL;
+		$response    = $allow_local ? wp_remote_post( $site_url . '/api/method/login', $args ) : wp_safe_remote_post( $site_url . '/api/method/login', $args );
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error(
-				'frappe_proxy_error',
-				sprintf( 'Could not reach %s: %s', $site_url, $response->get_error_message() ),
-				array( 'status' => 502 )
+			return new WP_Error( 'wpui_frappe_unavailable', __( 'WordPress could not reach the configured Frappe site.', 'wpui-frappe-plugin-starter' ), array( 'status' => 502 ) );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( $status < 200 || $status >= 300 || ! is_array( $data ) || isset( $data['exc_type'] ) ) {
+			return new WP_Error( 'wpui_frappe_login_failed', __( 'Frappe rejected the username or password.', 'wpui-frappe-plugin-starter' ), array( 'status' => 401 ) );
+		}
+
+		$stored = array();
+		foreach ( wp_remote_retrieve_cookies( $response ) as $cookie ) {
+			$stored[] = array(
+				'name'    => $cookie->name,
+				'value'   => $cookie->value,
+				'expires' => $cookie->expires,
 			);
 		}
-
-		$status_code = wp_remote_retrieve_response_code( $response );
-		$body_str    = wp_remote_retrieve_body( $response );
-		$data        = json_decode( $body_str, true );
-
-		if ( null === $data && ! empty( $body_str ) ) {
-			$data = array( 'message' => $body_str );
+		if ( empty( $stored ) ) {
+			return new WP_Error( 'wpui_frappe_session_missing', __( 'Frappe did not return a login session.', 'wpui-frappe-plugin-starter' ), array( 'status' => 502 ) );
 		}
 
-		$rest_response = new WP_REST_Response( $data ?: new stdClass(), $status_code );
+		update_user_meta( get_current_user_id(), self::USER_META_SESSION, $stored );
+		return $this->get_connection();
+	}
 
-		// Forward Set-Cookie headers back to browser if returned by Frappe login.
-		$cookies = wp_remote_retrieve_header( $response, 'set-cookie' );
-		if ( ! empty( $cookies ) ) {
-			if ( is_array( $cookies ) ) {
-				foreach ( $cookies as $cookie ) {
-					header( 'Set-Cookie: ' . $cookie, false );
-				}
-			} else {
-				header( 'Set-Cookie: ' . $cookies, false );
-			}
+	/** @return WP_REST_Response Clear the current user's server-side session. */
+	public function logout() {
+		delete_user_meta( get_current_user_id(), self::USER_META_SESSION );
+		return $this->get_connection();
+	}
+
+	/**
+	 * Relay an authenticated request to the fixed upstream site.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function proxy_request( $request ) {
+		$site_url = $this->get_site_url();
+		$token    = $this->get_api_token();
+		$cookies  = $this->get_session_cookies();
+		if ( '' === $site_url || ( '' === $token && empty( $cookies ) ) || ! $this->validate_site_url( $site_url ) ) {
+			return new WP_Error( 'wpui_frappe_not_configured', __( 'Connect with a Frappe login or API token first.', 'wpui-frappe-plugin-starter' ), array( 'status' => 503 ) );
 		}
 
-		return $rest_response;
+		$url = $site_url . '/' . ltrim( $request['path'], '/' );
+		$query = $request->get_query_params();
+		unset( $query['rest_route'] );
+		if ( $query ) {
+			$url = add_query_arg( $query, $url );
+		}
+
+		$args = array(
+			'method'      => $request->get_method(),
+			'headers'     => array(
+				'Accept'       => 'application/json',
+				'Content-Type' => 'application/json',
+			),
+			'cookies'     => $cookies,
+			'timeout'     => 20,
+			'redirection' => 0,
+			'sslverify'   => ! ( defined( 'WPUI_FRAPPE_ALLOW_INSECURE_TLS' ) && true === WPUI_FRAPPE_ALLOW_INSECURE_TLS ),
+		);
+		if ( '' !== $token && empty( $cookies ) ) {
+			$args['headers']['Authorization'] = 'token ' . $token;
+		}
+		if ( in_array( $request->get_method(), array( 'POST', 'PUT', 'PATCH', 'DELETE' ), true ) ) {
+			$args['body'] = $request->get_body();
+		}
+
+		$allow_local = defined( 'WPUI_FRAPPE_ALLOW_LOCAL' ) && true === WPUI_FRAPPE_ALLOW_LOCAL;
+		$response    = $allow_local ? wp_remote_request( $url, $args ) : wp_safe_remote_request( $url, $args );
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'wpui_frappe_unavailable', __( 'WordPress could not reach the configured Frappe site.', 'wpui-frappe-plugin-starter' ), array( 'status' => 502 ) );
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+		$body   = wp_remote_retrieve_body( $response );
+		$data   = json_decode( $body, true );
+		if ( JSON_ERROR_NONE !== json_last_error() ) {
+			$data = array( 'message' => __( 'Frappe returned an invalid JSON response.', 'wpui-frappe-plugin-starter' ) );
+		}
+
+		return new WP_REST_Response( $data, $status );
 	}
 }

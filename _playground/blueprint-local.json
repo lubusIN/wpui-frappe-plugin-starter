@@ -10,6 +10,14 @@
   },
   "steps": [
     {
+      "step": "defineWpConfigConsts",
+      "consts": {
+        "WP_ENVIRONMENT_TYPE": "local",
+        "WPUI_FRAPPE_ALLOW_LOCAL": true,
+        "WPUI_FRAPPE_ALLOW_INSECURE_TLS": true
+      }
+    },
+    {
       "step": "login"
     },
     {

@@ -17,7 +17,7 @@
 if ( typeof document !== 'undefined' && document.startViewTransition ) {
 	const originalStartViewTransition =
 		document.startViewTransition.bind( document );
-	document.startViewTransition = ( callback?: ViewTransitionCallback ) => {
+	document.startViewTransition = ( callback?: ViewTransitionUpdateCallback ) => {
 		const transition = originalStartViewTransition( callback );
 		if ( transition && transition.finished ) {
 			transition.finished.catch( () => {} );

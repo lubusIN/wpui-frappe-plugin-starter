@@ -1,8 +1,18 @@
 {
-  "name": "@lubusin/wpui-frappe-plugin-starter",
+  "name": "wpui-frappe-plugin-starter",
   "version": "0.1.0",
   "description": "WordPress plugin starter / template repository for WP Frappe Data Store with @wordpress/boot and @wordpress/build",
+  "license": "MIT",
   "private": true,
+  "files": [
+    "build/**/*.php",
+    "build/**/*.min.js",
+    "build/pages/*/loader.js",
+    "includes/",
+    "README.md",
+    "readme.txt",
+    "wpui-frappe-plugin-starter.php"
+  ],
   "workspaces": [
     "packages/*",
     "routes/*"
@@ -10,8 +20,12 @@
   "scripts": {
     "build": "wp-build",
     "postbuild": "node ./scripts/postbuild.mjs",
-    "dev": "npm run build && wp-build --watch",
-    "playground": "wp-playground-cli start --blueprint=_playground/blueprint-local.json"
+    "dev": "wp-build --watch",
+    "typecheck": "tsc --noEmit",
+    "lint:php": "php -l wpui-frappe-plugin-starter.php && php -l includes/class-rest-proxy.php",
+    "check": "npm run typecheck && npm run lint:php && npm run build",
+    "playground": "wp-playground-cli start --blueprint=_playground/blueprint-local.json",
+    "plugin-zip": "npm run check && wp-scripts plugin-zip"
   },
   "wpPlugin": {
     "name": "wp_frappe_data_store",
@@ -46,6 +60,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@wordpress/build": "latest",
+    "@wordpress/scripts": "latest",
     "@wp-playground/cli": "latest",
     "typescript": "latest"
   }

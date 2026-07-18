@@ -1,0 +1,15 @@
+/.git
+/.github
+/_playground
+/.agents
+/.codex
+/node_modules
+/packages
+/routes
+/scripts
+/.gitignore
+/.distignore
+/package-lock.json
+/package.json
+/tsconfig.json
+/*.log
