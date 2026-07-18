@@ -11,6 +11,7 @@
     "includes/",
     "README.md",
     "readme.txt",
+    "uninstall.php",
     "wpui-frappe-plugin-starter.php"
   ],
   "workspaces": [
@@ -21,9 +22,12 @@
     "build": "wp-build",
     "postbuild": "node ./scripts/postbuild.mjs",
     "dev": "wp-build --watch",
+    "format": "wp-scripts format packages/common/src packages/init/src routes/*/stage.tsx",
+    "lint:js": "wp-scripts lint-js packages/common/src packages/init/src routes/*/stage.tsx",
+    "lint:style": "wp-scripts lint-style 'packages/**/*.scss'",
     "typecheck": "tsc --noEmit",
-    "lint:php": "php -l wpui-frappe-plugin-starter.php && php -l includes/class-rest-proxy.php",
-    "check": "npm run typecheck && npm run lint:php && npm run build",
+    "lint:php": "php -l wpui-frappe-plugin-starter.php && php -l includes/class-plugin.php && php -l includes/class-rest-proxy.php && php -l uninstall.php",
+    "check": "npm run lint:js && npm run lint:style && npm run typecheck && npm run lint:php && npm run build",
     "playground": "wp-playground-cli start --blueprint=_playground/blueprint-local.json",
     "plugin-zip": "npm run check && wp-scripts plugin-zip"
   },
@@ -44,6 +48,7 @@
   "dependencies": {
     "@babel/core": "^7.24.0",
     "@lubusin/wp-frappe-data-store": "^0.1.0",
+    "@wordpress/admin-ui": "^2.5.0",
     "@wordpress/boot": "latest",
     "@wordpress/components": "^36.0.0",
     "@wordpress/data": "latest",

@@ -1,0 +1,26 @@
+/* Adapt Boot's standalone layout to the available wp-admin frame. */
+.boot-sidebar__scrollable {
+	overflow-x: hidden;
+}
+
+.boot-site-hub__title {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.boot-site-hub__title .components-external-link__contents {
+	width: 100%;
+	max-width: none;
+	min-width: 0;
+}
+
+@media (min-width: 782px) {
+
+	.boot-layout__sidebar:not(.is-mobile) {
+		width: 300px;
+	}
+
+	.boot-layout__surfaces {
+		margin: 16px 16px 16px 0;
+	}
+}

@@ -1,13 +1,5 @@
-import {
-	Button,
-	Flex,
-	FlexBlock,
-	FlexItem,
-	Modal,
-	Notice,
-	Spinner,
-	__experimentalConfirmDialog as ConfirmDialog,
-} from '@wordpress/components';
+import { Button, Modal, Notice, Spinner } from '@wordpress/components';
+import { Page } from '@wordpress/admin-ui';
 import {
 	DataViews,
 	filterSortAndPaginate,
@@ -15,14 +7,13 @@ import {
 	type Field,
 	type View,
 } from '@wordpress/dataviews';
-import {
-	Icon,
-	pencil,
-	plus,
-	trash,
-} from '@wordpress/icons';
+import { Icon, pencil, plus, trash } from '@wordpress/icons';
 import { useEffect, useMemo, useState } from '@wordpress/element';
-import type { FrappeListQuery, FrappeResource } from '@lubusin/wp-frappe-data-store';
+import { __, _n, sprintf } from '@wordpress/i18n';
+import type {
+	FrappeListQuery,
+	FrappeResource,
+} from '@lubusin/wp-frappe-data-store';
 import {
 	getListKey,
 	useDocTypeDefinition,
@@ -32,7 +23,6 @@ import {
 import {
 	forgetConnectionValidation,
 	getConnectionStatus,
-	getFrappeSiteUrl,
 	validateFrappeConnection,
 } from '../auth';
 import { ConnectionView } from './ConnectionView';
@@ -45,12 +35,16 @@ import { ResourceEditor } from './ResourceEditor';
 import { frappeStore } from '../store';
 import '../styles.scss';
 
-function initialView(definition?: DocTypeDefinition): View {
+function initialView( definition?: DocTypeDefinition ): View {
 	const visibleFields = definition
 		? definition.fields
-			.filter((field) => field.id !== definition.titleField && field.id !== 'owner')
-			.slice(0, 5)
-			.map((field) => field.id)
+				.filter(
+					( field ) =>
+						field.id !== definition.titleField &&
+						field.id !== 'owner'
+				)
+				.slice( 0, 5 )
+				.map( ( field ) => field.id )
 		: [];
 	return {
 		type: 'table',
@@ -63,82 +57,116 @@ function initialView(definition?: DocTypeDefinition): View {
 	};
 }
 
-function fieldType(field: ResourceFieldDefinition): Field<FrappeResource>['type'] {
-	if (field.type === 'checkbox') return 'boolean';
-	if (field.type === 'date') return 'date';
-	if (field.type === 'datetime') return 'datetime';
-	if (field.type === 'number') return 'number';
+function fieldType(
+	field: ResourceFieldDefinition
+): Field< FrappeResource >[ 'type' ] {
+	if ( field.type === 'checkbox' ) {
+		return 'boolean';
+	}
+	if ( field.type === 'date' ) {
+		return 'date';
+	}
+	if ( field.type === 'datetime' ) {
+		return 'datetime';
+	}
+	if ( field.type === 'number' ) {
+		return 'number';
+	}
 	return 'text';
 }
 
-function makeFields(definition: DocTypeDefinition): Field<FrappeResource>[] {
-	return definition.fields.map((field) => ({
+function makeFields(
+	definition: DocTypeDefinition
+): Field< FrappeResource >[] {
+	return definition.fields.map( ( field ) => ( {
 		id: field.id,
 		label: field.label,
-		type: fieldType(field),
+		type: fieldType( field ),
 		readOnly: field.readOnly,
 		enableSorting: true,
 		enableGlobalSearch: field.type !== 'textarea',
 		enableHiding: field.id !== definition.titleField,
 		filterBy: field.type === 'textarea' ? false : {},
-		elements: field.options?.map((option) => ({
+		elements: field.options?.map( ( option ) => ( {
 			value: option,
 			label: option,
-		})),
-		getValue: ({ item }) => item?.[field.id],
-	}));
+		} ) ),
+		getValue: ( { item } ) => item?.[ field.id ],
+	} ) );
 }
 
-function errorMessage(error: unknown): string {
-	if (error instanceof Error) return error.message;
-	return typeof error === 'string' ? error : 'The request could not be completed.';
+function errorMessage( error: unknown ): string {
+	if ( error instanceof Error ) {
+		return error.message;
+	}
+	return typeof error === 'string'
+		? error
+		: __(
+				'The request could not be completed.',
+				'wpui-frappe-plugin-starter'
+		  );
 }
 
 type Props = {
 	docType: string;
 };
 
-export function ResourceView({ docType }: Props) {
-	const [connectionState, setConnectionState] = useState<
+export function ResourceView( { docType }: Props ) {
+	const [ connectionState, setConnectionState ] = useState<
 		'checking' | 'connected' | 'disconnected'
-	>(() => {
+	>( () => {
 		const status = getConnectionStatus();
-		if (status === 'connected') return 'connected';
-		if (status === 'disconnected') return 'disconnected';
+		if ( status === 'connected' ) {
+			return 'connected';
+		}
+		if ( status === 'disconnected' ) {
+			return 'disconnected';
+		}
 		return 'checking';
-	});
+	} );
 	const selectedShell = useMemo(
-		() => DOC_TYPE_SHELLS.find((shell) => shell.name === docType) ?? { name: docType, label: docType, description: '' },
-		[docType]
+		() =>
+			DOC_TYPE_SHELLS.find( ( shell ) => shell.name === docType ) ?? {
+				name: docType,
+				label: docType,
+				description: '',
+			},
+		[ docType ]
 	);
 
-	useEffect(() => {
-		if (connectionState !== 'checking') return;
+	useEffect( () => {
+		if ( connectionState !== 'checking' ) {
+			return;
+		}
 		let isCurrent = true;
 		void validateFrappeConnection().then(
 			() => {
-				if (isCurrent) setConnectionState('connected');
+				if ( isCurrent ) {
+					setConnectionState( 'connected' );
+				}
 			},
 			() => {
-				if (isCurrent) setConnectionState('disconnected');
+				if ( isCurrent ) {
+					setConnectionState( 'disconnected' );
+				}
 			}
 		);
 		return () => {
 			isCurrent = false;
 		};
-	}, [connectionState]);
+	}, [ connectionState ] );
 
-	if (connectionState === 'checking') {
+	if ( connectionState === 'checking' ) {
 		return <ConnectionView isChecking />;
 	}
 
-	if (connectionState === 'disconnected') {
+	if ( connectionState === 'disconnected' ) {
 		return (
 			<ConnectionView
-				isChecking={false}
-				onAuthenticated={() => {
-					setConnectionState('connected');
-				}}
+				isChecking={ false }
+				onAuthenticated={ () => {
+					setConnectionState( 'connected' );
+				} }
 			/>
 		);
 	}
@@ -146,11 +174,11 @@ export function ResourceView({ docType }: Props) {
 	// Only mount data-fetching hooks once connection is confirmed.
 	return (
 		<ConnectedResourceView
-			selectedShell={selectedShell}
-			onDisconnect={() => {
+			selectedShell={ selectedShell }
+			onDisconnect={ () => {
 				forgetConnectionValidation();
-				setConnectionState('disconnected');
-			}}
+				setConnectionState( 'disconnected' );
+			} }
 		/>
 	);
 }
@@ -164,52 +192,63 @@ type ConnectedProps = {
  * Inner component that is only mounted when the Frappe connection has been
  * verified. Keeping all store hooks here ensures that resolvers never fire
  * before auth is established, which previously caused a crash loop.
+ * @param root0
+ * @param root0.selectedShell
+ * @param root0.onDisconnect
  */
-function ConnectedResourceView({ selectedShell, onDisconnect }: ConnectedProps) {
+function ConnectedResourceView( {
+	selectedShell,
+	onDisconnect,
+}: ConnectedProps ) {
 	const {
 		docTypeDefinition: definition,
 		isResolving: isDefinitionResolving,
 		error: definitionError,
-	} = useDocTypeDefinition(frappeStore, selectedShell.name);
+	} = useDocTypeDefinition( frappeStore, selectedShell.name );
 
-	if (definitionError) {
+	if ( definitionError ) {
+		const metadataError = sprintf(
+			/* translators: %s: resource type. */
+			__( 'Could not load %s metadata.', 'wpui-frappe-plugin-starter' ),
+			selectedShell.label.toLowerCase()
+		);
 		return (
-			<div className="frappe-main-frame">
-				<header className="frappe-topbar">
-					<h1>{selectedShell.label}</h1>
-				</header>
-				<Notice status="error" isDismissible={false}>
-					<strong>Couldn't load {selectedShell.label.toLowerCase()} metadata.</strong>{' '}
-					{errorMessage(definitionError)}{' '}
-					<Button variant="link" onClick={onDisconnect}>
-						Reconnect to Frappe
+			<Page title={ selectedShell.label } className="frappe-page">
+				<Notice
+					className="frappe-notice"
+					status="error"
+					isDismissible={ false }
+				>
+					<strong>{ metadataError }</strong>{ ' ' }
+					{ errorMessage( definitionError ) }{ ' ' }
+					<Button variant="link" onClick={ onDisconnect }>
+						{ __(
+							'Reconnect to Frappe',
+							'wpui-frappe-plugin-starter'
+						) }
 					</Button>
 				</Notice>
-			</div>
+			</Page>
 		);
 	}
 
-	if (!definition) {
+	if ( ! definition ) {
 		return (
-			<div className="frappe-main-frame">
-				<header className="frappe-topbar">
-					<Flex align="center" gap={3}>
-						<div className="frappe-page-title">
-							<h1>{selectedShell.label}</h1>
-							{selectedShell.description && <p>{selectedShell.description}</p>}
-						</div>
-						{isDefinitionResolving && <Spinner />}
-					</Flex>
-				</header>
-			</div>
+			<Page title={ selectedShell.label } className="frappe-page">
+				{ isDefinitionResolving && (
+					<div className="frappe-page-loading">
+						<Spinner />
+					</div>
+				) }
+			</Page>
 		);
 	}
 
 	return (
 		<ResourceDataView
-			selectedShell={selectedShell}
-			definition={definition}
-			onDisconnect={onDisconnect}
+			selectedShell={ selectedShell }
+			definition={ definition }
+			onDisconnect={ onDisconnect }
 		/>
 	);
 }
@@ -218,49 +257,47 @@ type ResourceDataViewProps = ConnectedProps & {
 	definition: DocTypeDefinition;
 };
 
-function ResourceDataView({
+function ResourceDataView( {
 	selectedShell,
 	definition,
 	onDisconnect,
-}: ResourceDataViewProps) {
-	const [view, setView] = useState<View>(() => initialView());
-	const [selection, setSelection] = useState<string[]>([]);
-	const [showCreate, setShowCreate] = useState(false);
-	const [notice, setNotice] = useState<string>();
-	const [actionError, setActionError] = useState<string>();
-	const [isDeleting, setDeleting] = useState(false);
-	const [isRefreshing, setRefreshing] = useState(false);
-	const [visibleResources, setVisibleResources] = useState<FrappeResource[] | undefined>();
-	const [pendingDeletion, setPendingDeletion] = useState<{
+}: ResourceDataViewProps ) {
+	const [ view, setView ] = useState< View >( () => initialView() );
+	const [ selection, setSelection ] = useState< string[] >( [] );
+	const [ showCreate, setShowCreate ] = useState( false );
+	const [ notice, setNotice ] = useState< string >();
+	const [ actionError, setActionError ] = useState< string >();
+	const [ isDeleting, setDeleting ] = useState( false );
+	const [ isRefreshing, setRefreshing ] = useState( false );
+	const [ visibleResources, setVisibleResources ] = useState<
+		FrappeResource[] | undefined
+	>();
+	const [ pendingDeletion, setPendingDeletion ] = useState< {
 		items: FrappeResource[];
 		doctype: string;
-		onActionPerformed?: (items: FrappeResource[]) => void;
-	}>();
+		onActionPerformed?: ( items: FrappeResource[] ) => void;
+	} >();
 
-	useEffect(() => {
-		if (definition) {
-			setView(initialView(definition));
-		} else {
-			setView(initialView());
-		}
-		setSelection([]);
-		setNotice(undefined);
-		setActionError(undefined);
-	}, [definition]);
+	useEffect( () => {
+		setView( initialView( definition ) );
+		setSelection( [] );
+		setNotice( undefined );
+		setActionError( undefined );
+	}, [ definition ] );
 
-	const fields = useMemo(() => makeFields(definition), [definition]);
+	const fields = useMemo( () => makeFields( definition ), [ definition ] );
 
-	const listQuery = useMemo<FrappeListQuery>(() => {
+	const listQuery = useMemo< FrappeListQuery >( () => {
 		return {
-			fields: definition.fields.map((field) => field.id),
+			fields: definition.fields.map( ( field ) => field.id ),
 			limit: 100,
 			orderBy: 'modified desc',
 		};
-	}, [definition]);
+	}, [ definition ] );
 
 	const currentListKey = useMemo(
-		() => getListKey(selectedShell.name, listQuery),
-		[selectedShell.name, listQuery]
+		() => getListKey( selectedShell.name, listQuery ),
+		[ selectedShell.name, listQuery ]
 	);
 
 	const {
@@ -268,7 +305,7 @@ function ResourceDataView({
 		fetchResourceList,
 		invalidateResourceLists,
 		saveResource,
-	} = useFrappeResourceActions(frappeStore);
+	} = useFrappeResourceActions( frappeStore );
 
 	const { resources, isResolving, error } = useFrappeResourceList(
 		frappeStore,
@@ -276,246 +313,355 @@ function ResourceDataView({
 		listQuery
 	);
 
-	useEffect(() => {
-		setVisibleResources(undefined);
-	}, [currentListKey]);
+	useEffect( () => {
+		setVisibleResources( undefined );
+	}, [ currentListKey ] );
 
-	useEffect(() => {
-		if (resources) {
-			setVisibleResources(resources);
+	useEffect( () => {
+		if ( resources ) {
+			setVisibleResources( resources );
 		}
-	}, [resources]);
+	}, [ resources ] );
 
 	const displayedResources = resources ?? visibleResources;
 	const placeholderResources =
-		isResolving && !(displayedResources?.length)
-			? Array.from({ length: 6 }).map((_, index) => ({
-					name: `placeholder-${selectedShell.name}-${index}`,
-				}))
+		isResolving && ! displayedResources?.length
+			? Array.from( { length: 6 } ).map( ( _, index ) => ( {
+					name: `placeholder-${ selectedShell.name }-${ index }`,
+			  } ) )
 			: undefined;
 	const processed = useMemo(
-		() => filterSortAndPaginate((displayedResources || placeholderResources) ?? [], view, fields),
-		[displayedResources, placeholderResources, view, fields]
+		() =>
+			filterSortAndPaginate(
+				( displayedResources || placeholderResources ) ?? [],
+				view,
+				fields
+			),
+		[ displayedResources, placeholderResources, view, fields ]
 	);
 
 	async function refresh() {
-		setRefreshing(true);
-		setNotice(undefined);
-		setActionError(undefined);
+		setRefreshing( true );
+		setNotice( undefined );
+		setActionError( undefined );
 		try {
 			const doctype = definition.name ?? selectedShell.name;
-			await Promise.resolve(invalidateResourceLists(doctype));
-			await fetchResourceList(doctype, listQuery);
-		} catch (refreshError) {
-			setActionError(errorMessage(refreshError));
+			await Promise.resolve( invalidateResourceLists( doctype ) );
+			await fetchResourceList( doctype, listQuery );
+		} catch ( refreshError ) {
+			setActionError( errorMessage( refreshError ) );
 		} finally {
-			setRefreshing(false);
+			setRefreshing( false );
 		}
 	}
 
 	async function confirmDeletion() {
-		if (!pendingDeletion) return;
-		setDeleting(true);
-		setActionError(undefined);
+		if ( ! pendingDeletion ) {
+			return;
+		}
+		setDeleting( true );
+		setActionError( undefined );
 		try {
 			await Promise.all(
-				pendingDeletion.items.map((item) =>
-					deleteResource(pendingDeletion.doctype, item.name)
+				pendingDeletion.items.map( ( item ) =>
+					deleteResource( pendingDeletion.doctype, item.name )
 				)
 			);
-			setSelection([]);
+			setSelection( [] );
 			setNotice(
-				`${pendingDeletion.items.length} record${pendingDeletion.items.length === 1 ? '' : 's'} deleted.`
+				sprintf(
+					/* translators: %d: number of deleted records. */
+					_n(
+						'%d record deleted.',
+						'%d records deleted.',
+						pendingDeletion.items.length,
+						'wpui-frappe-plugin-starter'
+					),
+					pendingDeletion.items.length
+				)
 			);
-			pendingDeletion.onActionPerformed?.(pendingDeletion.items);
-		} catch (deleteError) {
-			setActionError(errorMessage(deleteError));
+			pendingDeletion.onActionPerformed?.( pendingDeletion.items );
+		} catch ( deleteError ) {
+			setActionError( errorMessage( deleteError ) );
 		} finally {
-			setDeleting(false);
-			setPendingDeletion(undefined);
+			setDeleting( false );
+			setPendingDeletion( undefined );
 		}
 	}
 
-	const actions = useMemo<Action<FrappeResource>[]>(() => {
-		if (!definition) {
-			return [];
-		}
-
+	const actions = useMemo< Action< FrappeResource >[] >( () => {
 		return [
 			{
 				id: 'edit',
-				label: 'Edit',
+				label: __( 'Edit', 'wpui-frappe-plugin-starter' ),
 				icon: pencil,
 				isPrimary: true,
 				supportsBulk: false,
-				modalHeader: (items) =>
-					`Edit ${definition?.name ?? ''} ${String(items?.[0]?.name || '')}`,
-				RenderModal: ({ items, closeModal, onActionPerformed }) => (
+				modalHeader: ( items ) =>
+					sprintf(
+						/* translators: 1: resource type, 2: record name. */
+						__( 'Edit %1$s %2$s', 'wpui-frappe-plugin-starter' ),
+						definition.name,
+						String( items[ 0 ]?.name || '' )
+					),
+				RenderModal: ( { items, closeModal, onActionPerformed } ) => (
 					<ResourceEditor
-						definition={definition}
-						item={items[0]}
-						onCancel={() => closeModal?.()}
-						onSubmit={async (values) => {
-							await saveResource(definition?.name ?? '', {
+						definition={ definition }
+						item={ items[ 0 ] }
+						onCancel={ () => closeModal?.() }
+						onSubmit={ async ( values ) => {
+							await saveResource( definition.name, {
 								...values,
-								name: items?.[0]?.name,
-							});
-							setNotice(`${definition?.name ?? 'Record'} saved.`);
-							onActionPerformed?.(items);
+								name: items?.[ 0 ]?.name,
+							} );
+							setNotice(
+								sprintf(
+									/* translators: %s: resource type. */
+									__(
+										'%s saved.',
+										'wpui-frappe-plugin-starter'
+									),
+									definition.name
+								)
+							);
+							onActionPerformed?.( items );
 							closeModal?.();
-						}}
+						} }
 					/>
 				),
 			},
 			{
 				id: 'delete',
-				label: (items) => (items.length > 1 ? 'Delete records' : 'Delete'),
+				label: ( items ) =>
+					items.length > 1
+						? __( 'Delete records', 'wpui-frappe-plugin-starter' )
+						: __( 'Delete', 'wpui-frappe-plugin-starter' ),
 				icon: trash,
 				isDestructive: true,
 				supportsBulk: true,
-				callback: (items, { onActionPerformed }) => {
-					setPendingDeletion({
+				callback: ( items, { onActionPerformed } ) => {
+					setPendingDeletion( {
 						items,
-						doctype: definition?.name ?? '',
+						doctype: definition.name,
 						onActionPerformed,
-					});
+					} );
 				},
 			},
 		];
-	}, [definition, saveResource]);
+	}, [ definition, saveResource ] );
 
 	return (
-		<div className="frappe-main-frame">
-			<header className="frappe-topbar">
-				<Flex align="center" gap={3}>
-					<FlexBlock>
-						<Flex align="center" gap={3}>
-							<div className="frappe-page-title">
-								<h1>{selectedShell.label}</h1>
-								{selectedShell.description && <p>{selectedShell.description}</p>}
+		<Page
+			title={ selectedShell.label }
+			className="frappe-page"
+			actions={
+				<>
+					<Button
+						variant="secondary"
+						onClick={ () => void refresh() }
+						isBusy={ isRefreshing }
+						disabled={ isRefreshing }
+					>
+						{ __( 'Refresh', 'wpui-frappe-plugin-starter' ) }
+					</Button>
+					<Button
+						variant="primary"
+						onClick={ () => setShowCreate( true ) }
+					>
+						{ sprintf(
+							/* translators: %s: resource type. */
+							__( 'Add %s', 'wpui-frappe-plugin-starter' ),
+							selectedShell.label.replace( /s$/, '' )
+						) }
+					</Button>
+				</>
+			}
+		>
+			{ Boolean( error ) && (
+				<Notice
+					className="frappe-notice"
+					status="error"
+					isDismissible={ false }
+				>
+					<strong>
+						{ sprintf(
+							/* translators: %s: resource type. */
+							__(
+								'Could not load %s.',
+								'wpui-frappe-plugin-starter'
+							),
+							selectedShell.label.toLowerCase()
+						) }
+					</strong>{ ' ' }
+					{ errorMessage( error ) }{ ' ' }
+					<Button variant="link" onClick={ onDisconnect }>
+						{ __(
+							'Connect to Frappe',
+							'wpui-frappe-plugin-starter'
+						) }
+					</Button>
+				</Notice>
+			) }
+			{ notice && (
+				<Notice
+					className="frappe-notice"
+					status="success"
+					onRemove={ () => setNotice( undefined ) }
+				>
+					{ notice }
+				</Notice>
+			) }
+			{ actionError && (
+				<Notice
+					className="frappe-notice"
+					status="error"
+					onRemove={ () => setActionError( undefined ) }
+				>
+					{ actionError }
+				</Notice>
+			) }
+
+			<section
+				className="frappe-data-card"
+				aria-label={ `${ selectedShell.label.toLowerCase() } data` }
+			>
+				<DataViews< FrappeResource >
+					view={ view }
+					onChangeView={ setView }
+					fields={ fields }
+					data={ processed.data }
+					getItemId={ ( item ) => item?.name ?? '' }
+					isLoading={ isResolving && ! displayedResources?.length }
+					paginationInfo={ processed.paginationInfo }
+					selection={ selection }
+					onChangeSelection={ setSelection }
+					actions={ actions }
+					search
+					searchLabel={ sprintf(
+						/* translators: %s: resource type. */
+						__( 'Search %s', 'wpui-frappe-plugin-starter' ),
+						selectedShell.label.toLowerCase()
+					) }
+					defaultLayouts={ {
+						table: {},
+						grid: { layout: { density: 'comfortable' } },
+						list: {},
+					} }
+					config={ { perPageSizes: [ 10, 20, 50, 100 ] } }
+					empty={
+						<div className="frappe-empty-state">
+							<div className="frappe-empty-icon">
+								<Icon icon={ plus } size={ 24 } />
 							</div>
-							{isResolving && !displayedResources?.length && (
-								<span className="frappe-loading-indicator">
-									<Spinner />
-									Loading
-								</span>
-							)}
-							<span className="frappe-sidebar-status" title={getFrappeSiteUrl()}>
-								<span className="frappe-status-dot" />
-								<span className="frappe-site-label">
-									{new URL(getFrappeSiteUrl()).host}
-								</span>
-							</span>
-						</Flex>
-					</FlexBlock>
-					<FlexItem>
-						<Flex gap={2}>
+							<h2>
+								{ sprintf(
+									/* translators: %s: resource type. */
+									__(
+										'No %s found',
+										'wpui-frappe-plugin-starter'
+									),
+									selectedShell.label.toLowerCase()
+								) }
+							</h2>
+							<p>
+								{ __(
+									'Create a record or adjust the active filters.',
+									'wpui-frappe-plugin-starter'
+								) }
+							</p>
 							<Button
 								variant="secondary"
-								onClick={() => void refresh()}
-								isBusy={isRefreshing}
-								disabled={isRefreshing}
+								onClick={ () => setShowCreate( true ) }
 							>
-								Refresh
+								{ sprintf(
+									/* translators: %s: resource type. */
+									__(
+										'Add %s',
+										'wpui-frappe-plugin-starter'
+									),
+									selectedShell.label.replace( /s$/, '' )
+								) }
 							</Button>
-							<Button
-								icon={plus}
-								variant="primary"
-								onClick={() => setShowCreate(true)}
-							>
-								Add {selectedShell.label.replace(/s$/, '')}
-							</Button>
-						</Flex>
-					</FlexItem>
-				</Flex>
-			</header>
-			<main className="frappe-main">
-				{Boolean(error) && (
-					<Notice status="error" isDismissible={false}>
-						<strong>Couldn't load {selectedShell.label.toLowerCase()}.</strong>{' '}
-						{errorMessage(error)}{' '}
-						<Button variant="link" onClick={onDisconnect}>
-							Connect to Frappe
-						</Button>
-					</Notice>
-				)}
-				{notice && (
-					<Notice status="success" onRemove={() => setNotice(undefined)}>
-						{notice}
-					</Notice>
-				)}
-				{actionError && (
-					<Notice status="error" onRemove={() => setActionError(undefined)}>
-						{actionError}
-					</Notice>
-				)}
-
-				<section className="frappe-data-card" aria-label={`${selectedShell.label.toLowerCase()} data`}>
-					<DataViews<FrappeResource>
-						view={view}
-						onChangeView={setView}
-						fields={fields}
-						data={processed.data}
-						getItemId={(item) => item?.name ?? ''}
-						isLoading={isResolving && !displayedResources?.length}
-						paginationInfo={processed.paginationInfo}
-						selection={selection}
-						onChangeSelection={setSelection}
-						actions={actions}
-						search
-						searchLabel={`Search ${selectedShell.label.toLowerCase()}`}
-						defaultLayouts={{
-							table: {},
-							grid: { layout: { density: 'comfortable' } },
-							list: {},
-						}}
-						config={{ perPageSizes: [10, 20, 50, 100] }}
-							empty={
-							<div className="frappe-empty-state">
-								<div className="frappe-empty-icon">
-									<Icon icon={plus} size={24} />
-								</div>
-								<h2>No {selectedShell.label.toLowerCase()} found</h2>
-								<p>Create a record or adjust the active filters.</p>
-								{definition && (
-									<Button variant="secondary" onClick={() => setShowCreate(true)}>
-										Add {selectedShell.label.replace(/s$/, '')}
-									</Button>
-								)}
-							</div>
-						}
-					/>
-				</section>
-			</main>
-
-			<ConfirmDialog
-				isOpen={Boolean(pendingDeletion)}
-				isBusy={isDeleting}
-				confirmButtonText="Delete"
-				onConfirm={() => void confirmDeletion()}
-				onCancel={() => setPendingDeletion(undefined)}
-			>
-				Delete {pendingDeletion?.items.length ?? 0}{' '}
-				{pendingDeletion?.doctype ?? 'record'}
-				{pendingDeletion?.items.length === 1 ? '' : ' records'}?{' '}
-				<strong>This action cannot be undone.</strong>
-			</ConfirmDialog>
-			{showCreate && definition && (
+						</div>
+					}
+				/>
+			</section>
+			{ pendingDeletion && (
 				<Modal
-					title={`Create ${definition?.name ?? selectedShell.name}`}
-					onRequestClose={() => setShowCreate(false)}
+					title={ __(
+						'Delete records',
+						'wpui-frappe-plugin-starter'
+					) }
+					onRequestClose={ () => setPendingDeletion( undefined ) }
+				>
+					<p>
+						{ sprintf(
+							/* translators: 1: number of records, 2: resource type. */
+							_n(
+								'Delete %1$d %2$s record?',
+								'Delete %1$d %2$s records?',
+								pendingDeletion.items.length,
+								'wpui-frappe-plugin-starter'
+							),
+							pendingDeletion.items.length,
+							pendingDeletion.doctype
+						) }{ ' ' }
+						<strong>
+							{ __(
+								'This action cannot be undone.',
+								'wpui-frappe-plugin-starter'
+							) }
+						</strong>
+					</p>
+					<div className="frappe-modal-actions">
+						<Button
+							variant="primary"
+							isDestructive
+							isBusy={ isDeleting }
+							disabled={ isDeleting }
+							onClick={ () => void confirmDeletion() }
+						>
+							{ __( 'Delete', 'wpui-frappe-plugin-starter' ) }
+						</Button>
+						<Button
+							variant="tertiary"
+							disabled={ isDeleting }
+							onClick={ () => setPendingDeletion( undefined ) }
+						>
+							{ __( 'Cancel', 'wpui-frappe-plugin-starter' ) }
+						</Button>
+					</div>
+				</Modal>
+			) }
+			{ showCreate && (
+				<Modal
+					title={ sprintf(
+						/* translators: %s: resource type. */
+						__( 'Create %s', 'wpui-frappe-plugin-starter' ),
+						definition.name
+					) }
+					onRequestClose={ () => setShowCreate( false ) }
 				>
 					<ResourceEditor
-						definition={definition}
-						onCancel={() => setShowCreate(false)}
-						onSubmit={async (values) => {
-							await saveResource(definition?.name ?? selectedShell.name, values);
-							setShowCreate(false);
-							setNotice(`${definition?.name ?? selectedShell.name} created.`);
-						}}
+						definition={ definition }
+						onCancel={ () => setShowCreate( false ) }
+						onSubmit={ async ( values ) => {
+							await saveResource( definition.name, values );
+							setShowCreate( false );
+							setNotice(
+								sprintf(
+									/* translators: %s: resource type. */
+									__(
+										'%s created.',
+										'wpui-frappe-plugin-starter'
+									),
+									definition.name
+								)
+							);
+						} }
 					/>
 				</Modal>
-			)}
-		</div>
+			) }
+		</Page>
 	);
 }

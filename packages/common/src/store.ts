@@ -1,12 +1,13 @@
-import { registerFrappeDataStore } from '@lubusin/wp-frappe-data-store';
-import { getWpNonceHeader } from './auth';
+import type { FrappeDataStore } from '@lubusin/wp-frappe-data-store';
 
-export const frappeStore = registerFrappeDataStore( {
-	storeName: 'frappe-sample-plugin/resources',
-	baseUrl: '/wp-json/wpui-frappe/v1/proxy',
-	apiPath: '/api/resource',
-	credentials: 'same-origin',
-	headers: () => ( {
-		...getWpNonceHeader(),
-	} ),
-} );
+type FrappeStoreWindow = Window & {
+	wpuiFrappeStore?: FrappeDataStore;
+};
+
+const browser = window as FrappeStoreWindow;
+
+if ( ! browser.wpuiFrappeStore ) {
+	throw new Error( 'The Frappe data store was not initialized.' );
+}
+
+export const frappeStore = browser.wpuiFrappeStore;

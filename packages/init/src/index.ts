@@ -1,5 +1,10 @@
 import './router-compat';
+import './shell.scss';
 import { dispatch } from '@wordpress/data';
+import {
+	registerFrappeDataStore,
+	type FrappeDataStore,
+} from '@lubusin/wp-frappe-data-store';
 import { store as bootStore } from '@wordpress/boot';
 import { __ } from '@wordpress/i18n';
 import {
@@ -9,14 +14,40 @@ import {
 	store,
 	pencil,
 	check,
-	cog,
+	settings,
 } from '@wordpress/icons';
+
+declare global {
+	interface Window {
+		wpuiFrappeStore?: FrappeDataStore;
+		wpApiSettings?: { nonce?: string };
+	}
+}
+
+function registerStore() {
+	if ( window.wpuiFrappeStore ) {
+		return;
+	}
+
+	window.wpuiFrappeStore = registerFrappeDataStore( {
+		storeName: 'wpui-frappe/resources',
+		baseUrl: '/wp-json/wpui-frappe/v1/proxy',
+		apiPath: '/api/resource',
+		credentials: 'same-origin',
+		headers: (): HeadersInit => {
+			const nonce = window.wpApiSettings?.nonce;
+			return nonce ? { 'X-WP-Nonce': nonce } : {};
+		},
+	} );
+}
 
 /**
  * Initialize page - this function is mandatory.
  * All init modules must export an 'init' function.
  */
 export async function init() {
+	registerStore();
+
 	dispatch( bootStore ).registerMenuItem( 'leads', {
 		id: 'leads',
 		label: __( 'Leads', 'wpui-frappe-plugin-starter' ),
@@ -55,8 +86,8 @@ export async function init() {
 	} );
 	dispatch( bootStore ).registerMenuItem( 'settings', {
 		id: 'settings',
-		label: __( 'Connection', 'wpui-frappe-plugin-starter' ),
+		label: __( 'Settings', 'wpui-frappe-plugin-starter' ),
 		to: '/settings',
-		icon: cog,
+		icon: settings,
 	} );
 }

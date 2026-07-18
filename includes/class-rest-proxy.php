@@ -113,8 +113,9 @@ final class WPUI_Frappe_REST_Proxy extends WP_REST_Controller {
 				'sanitize_callback' => 'sanitize_text_field',
 			),
 			'apiSecret' => array(
-				'type'              => 'string',
-				'sanitize_callback' => 'sanitize_text_field',
+				// Secrets are opaque values. Trimming occurs when the token is
+				// assembled; text sanitization could alter a valid credential.
+				'type' => 'string',
 			),
 			'clearToken' => array(
 				'type'    => 'boolean',

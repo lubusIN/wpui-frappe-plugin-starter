@@ -9,6 +9,7 @@
     ".": "./build-module/index.mjs"
   },
   "dependencies": {
+    "@lubusin/wp-frappe-data-store": "^0.1.0",
     "@wordpress/boot": "latest",
     "@wordpress/data": "latest",
     "@wordpress/i18n": "latest",

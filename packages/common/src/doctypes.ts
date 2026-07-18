@@ -10,10 +10,7 @@ export type DocTypeShell = {
 	icon?: string;
 };
 
-export type {
-	DocTypeDefinition,
-	ResourceFieldDefinition,
-};
+export type { DocTypeDefinition, ResourceFieldDefinition };
 
 export const DOC_TYPE_SHELLS: DocTypeShell[] = [
 	{
@@ -25,13 +22,15 @@ export const DOC_TYPE_SHELLS: DocTypeShell[] = [
 	{
 		name: 'CRM Deal',
 		label: 'Deals',
-		description: 'Qualified opportunities, value, ownership, and next steps.',
+		description:
+			'Qualified opportunities, value, ownership, and next steps.',
 		icon: 'deals',
 	},
 	{
 		name: 'Contact',
 		label: 'Contacts',
-		description: 'People connected to your leads, deals, and organizations.',
+		description:
+			'People connected to your leads, deals, and organizations.',
 		icon: 'contacts',
 	},
 	{

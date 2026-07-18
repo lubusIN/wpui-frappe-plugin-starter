@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@lubusin/wp-frappe-data-store": "^0.1.0",
+    "@wordpress/admin-ui": "^2.5.0",
     "@wordpress/components": "^36.0.0",
     "@wordpress/data": "latest",
     "@wordpress/dataviews": "^17.0.0",
