@@ -13,6 +13,8 @@ import { __, _n, sprintf } from '@wordpress/i18n';
 import type {
 	FrappeListQuery,
 	FrappeResource,
+} from '@lubusin/wp-frappe-data-store';
+import {
 	getListKey,
 	useDocTypeDefinition,
 	useFrappeResourceActions,

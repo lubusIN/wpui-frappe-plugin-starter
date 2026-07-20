@@ -11,6 +11,9 @@ This plugin showcases modern WordPress engineering practices, featuring a full-s
 
 For detailed architectural insights, including how we use `@wordpress/boot`, npm workspaces with `@wordpress/build`, and the server-side REST API proxy for CORS, please refer to the [Starter Templates Documentation](https://wp-frappe-data.lubus.in/guide/starter-templates) in the main `@lubusin/wp-frappe-data-store` repository.
 
+> [!CAUTION]
+> Project is currently under active development.
+
 ## Quickstart
 
 You can instantly test and interact with this plugin locally without installing Docker, MySQL, or a local PHP server! We include a pre-configured WordPress Playground setup.
