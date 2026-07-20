@@ -9,8 +9,6 @@ A full-featured standalone WordPress plugin starter and template repository demo
 
 This plugin showcases modern WordPress engineering practices, featuring a full-screen admin application powered by **`@wordpress/boot`** and the next-generation **`@wordpress/build`** tooling.
 
-For detailed architectural insights, including how we use `@wordpress/boot`, npm workspaces with `@wordpress/build`, and the server-side REST API proxy for CORS, please refer to the [Starter Templates Documentation](https://wp-frappe-data.lubus.in/guide/starter-templates) in the main `@lubusin/wp-frappe-data-store` repository.
-
 > [!CAUTION]
 > Project is currently under active development.
 
@@ -46,32 +44,14 @@ Running `npm run playground` will automatically:
 
 **Connecting to Frappe**: Once the app opens, enter the Frappe CRM origin and choose either username/password login or a dedicated API key/secret. Passwords are never persisted; Frappe sessions and API tokens remain server-side.
 
-### Production connection
+## Advanced Configuration & Deployment
 
-Keep Frappe credentials out of browser storage by defining them in `wp-config.php`:
+This plugin starter includes several advanced configurations and deployment setups. Please refer to the **[Starter Templates Documentation](https://wp-frappe-data.lubus.in/guide/starter-templates)** for detailed guides on:
 
-```php
-define( 'WPUI_FRAPPE_SITE_URL', 'https://crm.example.com' );
-define( 'WPUI_FRAPPE_API_TOKEN', 'API_KEY:API_SECRET' );
-```
-
-Use a dedicated, least-privilege Frappe user. Administrators may alternatively
-save the origin and API token through the Connection screen; the values remain
-server-side and are never returned by the REST API.
-
-Local/private network origins are rejected by default. For local development
-only, `WPUI_FRAPPE_ALLOW_LOCAL` can opt in to such origins. TLS verification
-remains enabled unless `WPUI_FRAPPE_ALLOW_INSECURE_TLS` is explicitly enabled.
-The included local Playground blueprint enables both flags so self-signed
-origins such as `https://frappe.localhost` work during development. Restart the
-Playground after changing blueprint constants.
-
-### Quality and release
-
-```bash
-npm run check       # TypeScript, PHP syntax, and production build
-npm run plugin-zip  # Create an installable release archive
-```
+- **Architectural Insights** (Server-side REST API proxy, `@wordpress/boot` usage)
+- **Production Connection** (Storing credentials securely in `wp-config.php`)
+- **Local Development Flags** (Allowing local/insecure origins)
+- **Quality and Release** (Building the installable plugin ZIP)
 
 ## Contributing
 
